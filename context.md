@@ -251,21 +251,24 @@ commands that may have already succeeded.
 
 ## 10. Session Handoff
 
-**Last known milestone:** Initial repository publication to GitHub (Completed). Current milestone: Local infrastructure baseline (PostgreSQL + Redis) and Flyway baseline migration.
+**Last known milestone:** Milestone 1: Flyway baseline migration (`V1__init_schema.sql`), JPA entities/repositories, and schema validation (Completed). Current milestone: Milestone 2: API key lifecycle service and cryptographic generation.
 
 **Last known confirmed state:**
-- Dedicated Git repository initialized inside the `gatekeeper` project folder.
-- Initial commit `8482cbe` pushed to `origin/main` (`https://github.com/savit0r/gatekeeper.git`).
-- `.gitignore` configured to safely ignore `.env`, `.env.*`, logs, and OS files.
-- `application.properties` updated with `${DB_PASSWORD:gatekeeper_dev}` fallback.
-- `compose.yml` updated to include both PostgreSQL 17 and Redis 7 (Alpine).
-- Untracked files staged: `skills.md`, `context.md`.
+- Dedicated Git repository up to date with `origin/main` (`b8c16de`).
+- Docker containers (`gatekeeper-postgres` and `gatekeeper-redis`) are running and healthy.
+- Flyway migration `src/main/resources/db/migration/V1__init_schema.sql` applied successfully to PostgreSQL (`developers`, `usage_plans`, `api_keys`, `usage_events`, indexes).
+- JPA entities and repositories implemented under `identity`, `plans`, `apikey`, and `usage` packages.
+- `spring.jpa.hibernate.ddl-auto=validate` enabled and verified.
+- Integration tests in `EntityPersistenceIntegrationTest` passed (2/2 tests passing).
 
 **Next action:**
-1. Start Docker Desktop and verify both containers (`gatekeeper-postgres` and `gatekeeper-redis`) are healthy.
-2. Run `./mvnw test` to verify Spring Boot context loads with PostgreSQL available.
-3. Commit `skills.md`, `context.md`, and `compose.yml`.
-4. Proceed to Milestone 1: Create initial Flyway migration `V1__init_schema.sql` and set `spring.jpa.hibernate.ddl-auto=validate`.
+1. Stage and commit the Flyway migration, domain entities, repositories, and persistence integration tests.
+2. Proceed to Milestone 2: API key lifecycle service:
+   - Cryptographically secure key generation (`SecureRandom`, format `gk_live_<entropy>`).
+   - Prefix extraction and SHA-256 hashing.
+   - Key creation, listing, rotation, and revocation business logic.
+   - Unit tests for API key generation and hashing.
 
 **Update this handoff after each meaningful milestone.**
+
 
