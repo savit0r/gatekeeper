@@ -251,24 +251,29 @@ commands that may have already succeeded.
 
 ## 10. Session Handoff
 
-**Last known milestone:** Milestone 1: Flyway baseline migration (`V1__init_schema.sql`), JPA entities/repositories, and schema validation (Completed). Current milestone: Milestone 2: API key lifecycle service and cryptographic generation.
+**Last known milestone:** Milestone 2: API key lifecycle service, cryptographic generation, and REST endpoints (Completed). Current milestone: Milestone 3: Protected endpoint and Redis-backed atomic rate limiter.
 
 **Last known confirmed state:**
-- Dedicated Git repository up to date with `origin/main` (`b8c16de`).
+- Dedicated Git repository up to date with `origin/main` (`e52682b`).
 - Docker containers (`gatekeeper-postgres` and `gatekeeper-redis`) are running and healthy.
-- Flyway migration `src/main/resources/db/migration/V1__init_schema.sql` applied successfully to PostgreSQL (`developers`, `usage_plans`, `api_keys`, `usage_events`, indexes).
-- JPA entities and repositories implemented under `identity`, `plans`, `apikey`, and `usage` packages.
-- `spring.jpa.hibernate.ddl-auto=validate` enabled and verified.
-- Integration tests in `EntityPersistenceIntegrationTest` passed (2/2 tests passing).
+- Cryptographic API key generation (`ApiKeyCrypto`) implemented using 256-bit `SecureRandom` entropy, 16-char prefix (`gk_live_<hex>`), and SHA-256 hash.
+- Constant-time hash verification via `MessageDigest.isEqual` to prevent timing attacks.
+- `ApiKeyService` implements key creation (raw key displayed once), listing (raw keys omitted), retrieval, revocation, rotation, and validation.
+- `ApiKeyController` and `GlobalExceptionHandler` expose REST endpoints (`POST /api/v1/keys`, `GET /api/v1/keys`, `GET /api/v1/keys/{id}`, `DELETE /api/v1/keys/{id}`, `POST /api/v1/keys/{id}/rotate`).
+- Comprehensive unit and WebMvc test suite passing (19/19 tests passing).
 
 **Next action:**
-1. Stage and commit the Flyway migration, domain entities, repositories, and persistence integration tests.
-2. Proceed to Milestone 2: API key lifecycle service:
-   - Cryptographically secure key generation (`SecureRandom`, format `gk_live_<entropy>`).
-   - Prefix extraction and SHA-256 hashing.
-   - Key creation, listing, rotation, and revocation business logic.
-   - Unit tests for API key generation and hashing.
+1. Stage and commit Milestone 2 changes.
+2. Proceed to Milestone 3: Protected endpoint and Redis-backed atomic rate limiter:
+   - Implement rate limiting strategy using atomic Redis operations / Lua script (fixed window or sliding window counter).
+   - Create Spring MVC interceptor / filter for `X-API-Key` authentication and rate limiting.
+   - Attach standard rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`.
+   - Return HTTP `429 Too Many Requests` when limits are exceeded.
+   - Implement protected sample endpoint: `GET /api/v1/protected/hello`.
+   - Implement Redis failure handling (fail-open/fail-closed decision documented).
+   - Add integration tests for rate limiting and concurrency.
 
 **Update this handoff after each meaningful milestone.**
+
 
 
