@@ -7,7 +7,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7%20Alpine-red.svg)](https://redis.io/)
-[![Build & Test](https://img.shields.io/badge/Tests-40%20Passed-success.svg)]()
+[![Build & Test](https://img.shields.io/badge/Tests-50%20Passed-success.svg)]()
 
 ---
 
@@ -21,9 +21,10 @@ flowchart TD
     
     subgraph Gateway Engine
         Interceptor -->|1. Validate Key| KeyService[ApiKeyService]
-        KeyService -->|Prefix Lookup + SHA-256| Postgres[(PostgreSQL 17)]
+        KeyService -->|1a. Fast Path: Redis Cache| Redis[(Redis 7)]
+        KeyService -->|1b. Cache Miss: Prefix Lookup| Postgres[(PostgreSQL 17)]
         Interceptor -->|2. Atomic Limit Check| RedisLimiter[RedisRateLimiter]
-        RedisLimiter -->|Lua Script INCR + TTL| Redis[(Redis 7)]
+        RedisLimiter -->|Lua Script INCR + TTL| Redis
         Interceptor -->|3. Forward If Allowed| SampleRoute[ProtectedSampleController]
         Interceptor -->|4. Async Event Log| UsageService[UsageEventService]
         UsageService -->|Async Telemetry| Postgres
@@ -38,7 +39,7 @@ flowchart TD
 
 ### Core Modules
 * **`identity`**: Developer account registration, profile management, and password hashing.
-* **`apikey`**: Cryptographic key generation (256-bit `SecureRandom` entropy), prefix candidate lookup, and constant-time SHA-256 validation. Raw secrets are shown **only once**.
+* **`apikey`**: Cryptographic key generation (256-bit `SecureRandom` entropy), prefix candidate lookup, constant-time SHA-256 validation, and sub-millisecond Redis key caching with instant cache eviction on revocation/rotation.
 * **`plans`**: Rate-limit tiers (`Starter`, `Pro`, `Enterprise`) specifying requests per time window.
 * **`gateway`**: HTTP request interception, rate-limit headers (`X-RateLimit-*`), atomic Redis enforcement, and `HTTP 429 Too Many Requests` responses.
 * **`usage`**: Asynchronous request outcome telemetry and aggregated analytics.

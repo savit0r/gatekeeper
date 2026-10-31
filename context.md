@@ -251,14 +251,19 @@ commands that may have already succeeded.
 
 ## 10. Session Handoff
 
-**Last known milestone:** CI Pipeline & Documentation Badges (Completed). All MVP Success Criteria met!
+**Last known milestone:** Redis API Key Caching (Completed). Sub-millisecond key lookups on hot path with instant eviction on revocation/rotation!
 
 **Last known confirmed state:**
-- Dedicated Git repository up to date with `origin/main` (`496b152`).
+- Dedicated Git repository up to date with `origin/main` (`e6d576a`).
 - Docker containers (`gatekeeper-postgres` and `gatekeeper-redis`) are running and healthy.
 - Continuous Integration:
   - `.github/workflows/ci.yml`: GitHub Actions pipeline with PostgreSQL 17 and Redis 7 service containers running `chmod +x mvnw && ./mvnw clean verify --batch-mode`.
   - Build status badge linked in `README.md`.
+- Redis API Key Caching:
+  - `CachedApiKey`: compact immutable record holding active key and plan limits.
+  - `RedisApiKeyCache`: `StringRedisTemplate` Redis Hash (`gatekeeper:keycache:<hash>`) with configurable TTL (`gatekeeper.cache.api-key-ttl-seconds=600`) and graceful fail-open resilience.
+  - `ApiKeyService`: checks Redis cache first; on cache miss, queries DB and populates cache; on key revocation or rotation, immediately evicts from Redis.
+  - `ApiKeyCacheIntegrationTest`: end-to-end integration test validating cache population on first call, cache hit on second call, and eviction on revocation.
 - Flyway migrations:
   - `V1__init_schema.sql`: tables for `developers`, `usage_plans`, `api_keys`, `usage_events`, indexes.
   - `V2__seed_default_plans.sql`: seeds deterministic default plans (`Starter`, `Pro`, `Enterprise`).
@@ -277,12 +282,12 @@ commands that may have already succeeded.
 - OpenAPI & Documentation:
   - Springdoc OpenAPI (Swagger UI) configured at `/swagger-ui.html`.
   - Comprehensive `README.md` with Mermaid architecture diagram, quickstart guide, and cURL walkthrough.
-- Full test suite: 40/40 tests passing (unit, slice, and end-to-end integration against PostgreSQL and Redis).
+- Full test suite: 50/50 tests passing (unit, slice, and end-to-end integration against PostgreSQL and Redis).
 
 **Next action:**
-1. Stage and commit `.github/workflows/ci.yml`, `README.md`, and `context.md`.
-2. Push to `origin/main` so GitHub Actions automatically executes the workflow on GitHub.
-3. Review options for subsequent enhancements (e.g. Redis key caching, JWT dashboard auth, Prometheus metrics).
+1. Stage and commit Redis API key caching changes.
+2. Push to `origin/main` so GitHub Actions automatically executes the workflow.
+3. Review subsequent enhancements (e.g. JWT authentication for developer dashboard, Prometheus metrics).
 
 **Update this handoff after each meaningful milestone.**
 

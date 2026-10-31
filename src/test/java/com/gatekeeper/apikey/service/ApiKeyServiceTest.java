@@ -14,6 +14,8 @@ import com.gatekeeper.identity.repository.DeveloperRepository;
 import com.gatekeeper.plans.domain.UsagePlan;
 import com.gatekeeper.plans.exception.UsagePlanNotFoundException;
 import com.gatekeeper.plans.repository.UsagePlanRepository;
+import com.gatekeeper.apikey.cache.ApiKeyCache;
+import com.gatekeeper.apikey.cache.CachedApiKey;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,9 @@ class ApiKeyServiceTest {
     @Mock
     private UsagePlanRepository usagePlanRepository;
 
+    @Mock
+    private ApiKeyCache apiKeyCache;
+
     private ApiKeyCrypto apiKeyCrypto;
     private ApiKeyService apiKeyService;
 
@@ -54,7 +59,7 @@ class ApiKeyServiceTest {
     @BeforeEach
     void setUp() {
         apiKeyCrypto = new ApiKeyCrypto();
-        apiKeyService = new ApiKeyService(apiKeyRepository, developerRepository, usagePlanRepository, apiKeyCrypto);
+        apiKeyService = new ApiKeyService(apiKeyRepository, developerRepository, usagePlanRepository, apiKeyCrypto, apiKeyCache);
 
         developer = new Developer(UUID.randomUUID(), "dev@gatekeeper.dev", "hash", "ROLE_DEVELOPER", Instant.now());
         plan = new UsagePlan(UUID.randomUUID(), "Standard", 100, 60, Instant.now());
@@ -186,5 +191,88 @@ class ApiKeyServiceTest {
                 .thenReturn(List.of());
 
         assertThat(apiKeyService.validateAndGetApiKey(generated.rawKey())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should return reconstructed ApiKey from cache and bypass database on cache hit")
+    void shouldReturnCachedKey_whenCacheHit() {
+        ApiKeyCrypto.GeneratedKey generated = apiKeyCrypto.generateKey();
+        UUID keyId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        CachedApiKey cached = new CachedApiKey(
+                keyId,
+                "Cached Key",
+                generated.keyPrefix(),
+                generated.keyHash(),
+                developer.getId(),
+                planId,
+                "Pro Plan",
+                500,
+                60,
+                ApiKeyStatus.ACTIVE,
+                null
+        );
+
+        when(apiKeyCache.get(generated.keyHash())).thenReturn(Optional.of(cached));
+
+        Optional<ApiKey> validated = apiKeyService.validateAndGetApiKey(generated.rawKey());
+
+        assertThat(validated).isPresent();
+        assertThat(validated.get().getId()).isEqualTo(keyId);
+        assertThat(validated.get().getName()).isEqualTo("Cached Key");
+        assertThat(validated.get().getPlan().getName()).isEqualTo("Pro Plan");
+        assertThat(validated.get().getPlan().getRequestsPerWindow()).isEqualTo(500);
+
+        // Verify database was NEVER queried!
+        verifyNoInteractions(apiKeyRepository);
+    }
+
+    @Test
+    @DisplayName("Should query database and populate cache on cache miss")
+    void shouldPopulateCache_whenCacheMiss() {
+        ApiKeyCrypto.GeneratedKey generated = apiKeyCrypto.generateKey();
+        ApiKey apiKey = new ApiKey(UUID.randomUUID(), developer, plan, "DB Key",
+                generated.keyPrefix(), generated.keyHash(), null);
+
+        when(apiKeyCache.get(generated.keyHash())).thenReturn(Optional.empty());
+        when(apiKeyRepository.findByKeyPrefixAndStatus(generated.keyPrefix(), ApiKeyStatus.ACTIVE))
+                .thenReturn(List.of(apiKey));
+
+        Optional<ApiKey> validated = apiKeyService.validateAndGetApiKey(generated.rawKey());
+
+        assertThat(validated).isPresent();
+        assertThat(validated.get().getId()).isEqualTo(apiKey.getId());
+
+        // Verify cache was populated
+        verify(apiKeyCache).put(eq(generated.keyHash()), any(CachedApiKey.class));
+    }
+
+    @Test
+    @DisplayName("Should evict key from cache when revoked")
+    void shouldEvictCache_onRevocation() {
+        UUID keyId = UUID.randomUUID();
+        ApiKey apiKey = new ApiKey(keyId, developer, plan, "Key to Revoke", "gk_live_12345678", "hash123", null);
+
+        when(apiKeyRepository.findByIdWithDetails(keyId)).thenReturn(Optional.of(apiKey));
+        when(apiKeyRepository.save(any(ApiKey.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        apiKeyService.revokeApiKey(developer.getId(), keyId);
+
+        verify(apiKeyCache).evict("hash123");
+    }
+
+    @Test
+    @DisplayName("Should evict old key from cache when rotated")
+    void shouldEvictCache_onRotation() {
+        UUID keyId = UUID.randomUUID();
+        ApiKey oldKey = new ApiKey(keyId, developer, plan, "Old Key", "gk_live_oldprefix", "oldhash", null);
+
+        when(apiKeyRepository.findByIdWithDetails(keyId)).thenReturn(Optional.of(oldKey));
+        when(apiKeyRepository.save(any(ApiKey.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        apiKeyService.rotateApiKey(developer.getId(), keyId);
+
+        verify(apiKeyCache).evict("oldhash");
     }
 }

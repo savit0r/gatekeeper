@@ -14,6 +14,10 @@ import com.gatekeeper.identity.repository.DeveloperRepository;
 import com.gatekeeper.plans.domain.UsagePlan;
 import com.gatekeeper.plans.exception.UsagePlanNotFoundException;
 import com.gatekeeper.plans.repository.UsagePlanRepository;
+import com.gatekeeper.apikey.cache.ApiKeyCache;
+import com.gatekeeper.apikey.cache.CachedApiKey;
+import com.gatekeeper.apikey.cache.NoOpApiKeyCache;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,15 +34,26 @@ public class ApiKeyService {
     private final DeveloperRepository developerRepository;
     private final UsagePlanRepository usagePlanRepository;
     private final ApiKeyCrypto apiKeyCrypto;
+    private final ApiKeyCache apiKeyCache;
+
+    @Autowired
+    public ApiKeyService(ApiKeyRepository apiKeyRepository,
+                         DeveloperRepository developerRepository,
+                         UsagePlanRepository usagePlanRepository,
+                         ApiKeyCrypto apiKeyCrypto,
+                         ApiKeyCache apiKeyCache) {
+        this.apiKeyRepository = apiKeyRepository;
+        this.developerRepository = developerRepository;
+        this.usagePlanRepository = usagePlanRepository;
+        this.apiKeyCrypto = apiKeyCrypto;
+        this.apiKeyCache = apiKeyCache;
+    }
 
     public ApiKeyService(ApiKeyRepository apiKeyRepository,
                          DeveloperRepository developerRepository,
                          UsagePlanRepository usagePlanRepository,
                          ApiKeyCrypto apiKeyCrypto) {
-        this.apiKeyRepository = apiKeyRepository;
-        this.developerRepository = developerRepository;
-        this.usagePlanRepository = usagePlanRepository;
-        this.apiKeyCrypto = apiKeyCrypto;
+        this(apiKeyRepository, developerRepository, usagePlanRepository, apiKeyCrypto, new NoOpApiKeyCache());
     }
 
     public ApiKeyCreatedResponse createApiKey(UUID developerId, CreateApiKeyRequest request) {
@@ -95,12 +110,14 @@ public class ApiKeyService {
         ApiKey apiKey = findApiKeyForDeveloper(developerId, keyId);
         apiKey.revoke();
         apiKeyRepository.save(apiKey);
+        apiKeyCache.evict(apiKey.getKeyHash());
     }
 
     public ApiKeyCreatedResponse rotateApiKey(UUID developerId, UUID keyId) {
         ApiKey oldKey = findApiKeyForDeveloper(developerId, keyId);
         oldKey.revoke();
         apiKeyRepository.save(oldKey);
+        apiKeyCache.evict(oldKey.getKeyHash());
 
         ApiKeyCrypto.GeneratedKey generatedKey = apiKeyCrypto.generateKey();
         ApiKey newKey = new ApiKey(
@@ -131,9 +148,9 @@ public class ApiKeyService {
     /**
      * Validates an incoming raw API key:
      * 1. Extracts the prefix
-     * 2. Finds candidate active keys by prefix
-     * 3. Performs constant-time comparison against the SHA-256 hash
-     * 4. Validates expiration
+     * 2. Checks Redis cache first (avoids DB queries on hot paths)
+     * 3. On cache miss, queries database by prefix and validates SHA-256 hash
+     * 4. Validates expiration and populates Redis cache
      */
     public Optional<ApiKey> validateAndGetApiKey(String rawKey) {
         String prefix = apiKeyCrypto.extractPrefix(rawKey);
@@ -141,14 +158,49 @@ public class ApiKeyService {
             return Optional.empty();
         }
 
+        String rawKeyHash = apiKeyCrypto.hashKey(rawKey);
+
+        // 1. Check Redis cache first
+        Optional<CachedApiKey> cachedOpt = apiKeyCache.get(rawKeyHash);
+        if (cachedOpt.isPresent()) {
+            CachedApiKey cached = cachedOpt.get();
+            if (cached.isExpired() || cached.status() != ApiKeyStatus.ACTIVE) {
+                apiKeyCache.evict(rawKeyHash);
+                return Optional.empty();
+            }
+            UsagePlan plan = new UsagePlan(cached.planId(), cached.planName(), cached.requestsPerWindow(), cached.windowSeconds(), null);
+            Developer dev = new Developer(cached.developerId(), "cached@gatekeeper.local", "cached", "ROLE_DEVELOPER", null);
+            ApiKey apiKey = new ApiKey(cached.id(), dev, plan, cached.name(), cached.keyPrefix(), cached.keyHash(), cached.expiresAt());
+            return Optional.of(apiKey);
+        }
+
+        // 2. Cache miss: DB query by prefix candidate
         List<ApiKey> candidates = apiKeyRepository.findByKeyPrefixAndStatus(prefix, ApiKeyStatus.ACTIVE);
         for (ApiKey candidate : candidates) {
             if (apiKeyCrypto.verifyKey(rawKey, candidate.getKeyHash())) {
                 if (candidate.getExpiresAt() != null && Instant.now().isAfter(candidate.getExpiresAt())) {
                     candidate.setStatus(ApiKeyStatus.EXPIRED);
                     apiKeyRepository.save(candidate);
+                    apiKeyCache.evict(rawKeyHash);
                     return Optional.empty();
                 }
+
+                // Populate cache for future requests
+                CachedApiKey toCache = new CachedApiKey(
+                        candidate.getId(),
+                        candidate.getName(),
+                        candidate.getKeyPrefix(),
+                        candidate.getKeyHash(),
+                        candidate.getDeveloper().getId(),
+                        candidate.getPlan().getId(),
+                        candidate.getPlan().getName(),
+                        candidate.getPlan().getRequestsPerWindow(),
+                        candidate.getPlan().getWindowSeconds(),
+                        candidate.getStatus(),
+                        candidate.getExpiresAt()
+                );
+                apiKeyCache.put(rawKeyHash, toCache);
+
                 return Optional.of(candidate);
             }
         }
