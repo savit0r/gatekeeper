@@ -251,24 +251,38 @@ commands that may have already succeeded.
 
 ## 10. Session Handoff
 
-**Last known milestone:** Milestone 4: Usage event recording, asynchronous tracking, and basic usage analytics (Completed). Current milestone: Milestone 5: Developer identity / dashboard authentication & OpenAPI documentation.
+**Last known milestone:** Milestone 5: Developer Registration, Seed Usage Plans, OpenAPI Documentation, and README Walkthrough (Completed). All MVP Success Criteria met!
 
 **Last known confirmed state:**
-- Dedicated Git repository up to date with `origin/main` (`5f06cc8`).
+- Dedicated Git repository up to date with `origin/main` (`ce0c22f`).
 - Docker containers (`gatekeeper-postgres` and `gatekeeper-redis`) are running and healthy.
-- Asynchronous usage event recording (`UsageEventService`) saves request route, HTTP status code, latency (ms), decision (`ALLOWED`/`REJECTED`), and rejection reason without adding response overhead.
-- Gateway interceptor (`ApiKeyRateLimitInterceptor`) seamlessly logs allowed requests in `afterCompletion` and rejected requests in `preHandle`.
-- `UsageAnalyticsController` exposes `GET /api/v1/analytics/keys/{keyId}/summary` (total, allowed, rejected, avg latency) and `GET /api/v1/analytics/keys/{keyId}/events` (recent audit logs).
-- Full test suite passes: 32/32 tests passing, including `GatewayIntegrationTest` verifying rate limiting and event persistence in PostgreSQL.
+- Flyway migrations:
+  - `V1__init_schema.sql`: tables for `developers`, `usage_plans`, `api_keys`, `usage_events`, indexes.
+  - `V2__seed_default_plans.sql`: seeds deterministic default plans (`Starter`, `Pro`, `Enterprise`).
+- Identity & Plans:
+  - `DeveloperService` & `DeveloperController`: developer registration with SHA-256 hashed passwords and profile retrieval.
+  - `UsagePlanController`: lists available usage tiers.
+- API Key Lifecycle:
+  - 256-bit entropy key generation (`gk_live_<prefix>_<secret>`), prefix lookup, SHA-256 hashing, constant-time validation (`MessageDigest.isEqual`), creation (shown once), rotation, and revocation.
+- Atomic Rate Limiting & Gateway:
+  - `RedisRateLimiter`: single atomic Lua script (`INCR`, `EXPIRE`, `TTL`) with fail-closed/fail-open policies.
+  - `ApiKeyRateLimitInterceptor`: verifies keys, attaches `X-RateLimit-*` headers, returns `HTTP 429` with `Retry-After`.
+  - `ProtectedSampleController`: `GET /api/v1/protected/hello`.
+- Usage Tracking & Analytics:
+  - `UsageEventService`: asynchronous non-blocking event recording (`ALLOWED`/`REJECTED`, latency, rejection reason).
+  - `UsageAnalyticsController`: summary statistics and recent audit event log.
+- OpenAPI & Documentation:
+  - Springdoc OpenAPI (Swagger UI) configured at `/swagger-ui.html`.
+  - Comprehensive `README.md` with Mermaid architecture diagram, quickstart guide, and cURL walkthrough.
+- Full test suite: 40/40 tests passing (unit, slice, and end-to-end integration against PostgreSQL and Redis).
 
 **Next action:**
-1. Stage and commit Milestone 4 changes.
-2. Proceed to Milestone 5: Developer identity and OpenAPI docs:
-   - Developer registration and dashboard authentication.
-   - Springdoc OpenAPI (Swagger UI) configuration for developer API exploration.
-   - Seed initial default usage plans (e.g. Starter: 60 req/min, Pro: 1000 req/min).
+1. Stage and commit Milestone 5 changes.
+2. Push to `origin/main`.
+3. Provide final summary and verification steps to the user.
 
 **Update this handoff after each meaningful milestone.**
+
 
 
 
