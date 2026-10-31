@@ -251,14 +251,19 @@ commands that may have already succeeded.
 
 ## 10. Session Handoff
 
-**Last known milestone:** Redis API Key Caching (Completed). Sub-millisecond key lookups on hot path with instant eviction on revocation/rotation!
+**Last known milestone:** Developer JWT Authentication & Security (Completed). Stateless HMAC-SHA256 Bearer token authentication for all dashboard APIs!
 
 **Last known confirmed state:**
-- Dedicated Git repository up to date with `origin/main` (`e6d576a`).
+- Dedicated Git repository up to date with `origin/main` (`2074110`).
 - Docker containers (`gatekeeper-postgres` and `gatekeeper-redis`) are running and healthy.
 - Continuous Integration:
   - `.github/workflows/ci.yml`: GitHub Actions pipeline with PostgreSQL 17 and Redis 7 service containers running `chmod +x mvnw && ./mvnw clean verify --batch-mode`.
   - Build status badge linked in `README.md`.
+- Developer JWT Authentication:
+  - `JwtService`: zero-dependency HMAC-SHA256 JWT creation, signing, parsing, constant-time signature verification, and expiration enforcement.
+  - `AuthService` & `AuthController`: `POST /api/v1/auth/login` verifies developer credentials and issues signed Bearer tokens.
+  - `DeveloperSecurityResolver`: resolves authenticated developer ID from `Authorization: Bearer <jwt>` with backward-compatible `X-Developer-Id` header fallback.
+  - Secured dashboard controllers (`/api/v1/developers/me`, `/api/v1/keys`, `/api/v1/analytics`).
 - Redis API Key Caching:
   - `CachedApiKey`: compact immutable record holding active key and plan limits.
   - `RedisApiKeyCache`: `StringRedisTemplate` Redis Hash (`gatekeeper:keycache:<hash>`) with configurable TTL (`gatekeeper.cache.api-key-ttl-seconds=600`) and graceful fail-open resilience.
@@ -282,12 +287,12 @@ commands that may have already succeeded.
 - OpenAPI & Documentation:
   - Springdoc OpenAPI (Swagger UI) configured at `/swagger-ui.html`.
   - Comprehensive `README.md` with Mermaid architecture diagram, quickstart guide, and cURL walkthrough.
-- Full test suite: 50/50 tests passing (unit, slice, and end-to-end integration against PostgreSQL and Redis).
+- Full test suite: 58/58 tests passing (unit, slice, and end-to-end integration against PostgreSQL and Redis).
 
 **Next action:**
-1. Stage and commit Redis API key caching changes.
+1. Stage and commit JWT authentication changes.
 2. Push to `origin/main` so GitHub Actions automatically executes the workflow.
-3. Review subsequent enhancements (e.g. JWT authentication for developer dashboard, Prometheus metrics).
+3. Review subsequent enhancements (e.g. Micrometer Prometheus metrics).
 
 **Update this handoff after each meaningful milestone.**
 

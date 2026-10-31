@@ -24,8 +24,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.gatekeeper.identity.security.DeveloperSecurityResolver;
+import com.gatekeeper.identity.security.JwtService;
+
 @WebMvcTest(DeveloperController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, DeveloperSecurityResolver.class, JwtService.class})
 class DeveloperControllerTest {
 
     @Autowired

@@ -26,8 +26,11 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.gatekeeper.identity.security.DeveloperSecurityResolver;
+import com.gatekeeper.identity.security.JwtService;
+
 @WebMvcTest(ApiKeyController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, DeveloperSecurityResolver.class, JwtService.class})
 class ApiKeyControllerTest {
 
     @Autowired

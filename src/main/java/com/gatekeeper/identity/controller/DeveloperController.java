@@ -3,6 +3,8 @@ package com.gatekeeper.identity.controller;
 import com.gatekeeper.identity.dto.DeveloperResponse;
 import com.gatekeeper.identity.dto.RegisterDeveloperRequest;
 import com.gatekeeper.identity.service.DeveloperService;
+import com.gatekeeper.identity.security.DeveloperSecurityResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +17,11 @@ import java.util.UUID;
 public class DeveloperController {
 
     private final DeveloperService developerService;
+    private final DeveloperSecurityResolver securityResolver;
 
-    public DeveloperController(DeveloperService developerService) {
+    public DeveloperController(DeveloperService developerService, DeveloperSecurityResolver securityResolver) {
         this.developerService = developerService;
+        this.securityResolver = securityResolver;
     }
 
     @PostMapping("/register")
@@ -27,8 +31,11 @@ public class DeveloperController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<DeveloperResponse> getProfile(@RequestHeader("X-Developer-Id") UUID developerId) {
-        DeveloperResponse response = developerService.getDeveloper(developerId);
+    public ResponseEntity<DeveloperResponse> getProfile(
+            HttpServletRequest request,
+            @RequestHeader(value = "X-Developer-Id", required = false) UUID developerId) {
+        UUID authenticatedDevId = securityResolver.resolveDeveloperId(request, developerId);
+        DeveloperResponse response = developerService.getDeveloper(authenticatedDevId);
         return ResponseEntity.ok(response);
     }
 }

@@ -7,7 +7,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7%20Alpine-red.svg)](https://redis.io/)
-[![Build & Test](https://img.shields.io/badge/Tests-50%20Passed-success.svg)]()
+[![Build & Test](https://img.shields.io/badge/Tests-58%20Passed-success.svg)]()
 
 ---
 
@@ -31,14 +31,14 @@ flowchart TD
     end
     
     subgraph Developer Management
-        Dev[Developer Dashboard] -->|REST API| DevController[Developer & Key APIs]
+        Dev[Developer Dashboard] -->|Bearer JWT / Auth| DevController[Auth, Developer & Key APIs]
         DevController --> Postgres
         Dev -->|Interactive Docs| Swagger[OpenAPI / Swagger UI]
     end
 ```
 
 ### Core Modules
-* **`identity`**: Developer account registration, profile management, and password hashing.
+* **`identity`**: Developer account registration, profile management, password hashing, and stateless HMAC-SHA256 JWT authentication (`POST /api/v1/auth/login`).
 * **`apikey`**: Cryptographic key generation (256-bit `SecureRandom` entropy), prefix candidate lookup, constant-time SHA-256 validation, and sub-millisecond Redis key caching with instant cache eviction on revocation/rotation.
 * **`plans`**: Rate-limit tiers (`Starter`, `Pro`, `Enterprise`) specifying requests per time window.
 * **`gateway`**: HTTP request interception, rate-limit headers (`X-RateLimit-*`), atomic Redis enforcement, and `HTTP 429 Too Many Requests` responses.
@@ -106,22 +106,34 @@ curl -X POST http://localhost:8080/api/v1/developers/register \
     "password": "strongPassword123"
   }'
 ```
-*Save the returned `id` as `DEVELOPER_ID`.*
 
 ---
 
-### 2. List Usage Plans
+### 2. Authenticate & Obtain JWT Bearer Token
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "developer@example.com",
+    "password": "strongPassword123"
+  }'
+```
+*Save the returned `token` as `JWT_TOKEN`.*
+
+---
+
+### 3. List Usage Plans
 ```bash
 curl http://localhost:8080/api/v1/plans
 ```
-Response includes default seeded plans (`Starter` - 60 req/min, `Pro` - 1000 req/min).
+Response includes default seeded plans (`Starter` - 60 req/min, `Pro` - 1000 req/min, `Enterprise` - 10000 req/min).
 
 ---
 
-### 3. Create an API Key
+### 4. Create an API Key (Authenticated via Bearer Token)
 ```bash
 curl -X POST http://localhost:8080/api/v1/keys \
-  -H "X-Developer-Id: <DEVELOPER_ID>" \
+  -H "Authorization: Bearer <JWT_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Production Key",

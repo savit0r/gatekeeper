@@ -63,7 +63,17 @@ public class DeveloperService {
         );
     }
 
-    private String hashPassword(String rawPassword) {
+    public boolean verifyPassword(String rawPassword, String storedHash) {
+        if (rawPassword == null || storedHash == null) {
+            return false;
+        }
+        String computedHash = hashPassword(rawPassword);
+        byte[] computedBytes = computedHash.getBytes(StandardCharsets.UTF_8);
+        byte[] storedBytes = storedHash.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(computedBytes, storedBytes);
+    }
+
+    public String hashPassword(String rawPassword) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(rawPassword.getBytes(StandardCharsets.UTF_8));
