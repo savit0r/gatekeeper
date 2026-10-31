@@ -113,7 +113,7 @@ class ApiKeyServiceTest {
     @DisplayName("Should revoke active API key")
     void shouldRevokeApiKey() {
         ApiKey apiKey = new ApiKey(UUID.randomUUID(), developer, plan, "Key", "gk_live_12345678", "hash", null);
-        when(apiKeyRepository.findById(apiKey.getId())).thenReturn(Optional.of(apiKey));
+        when(apiKeyRepository.findByIdWithDetails(apiKey.getId())).thenReturn(Optional.of(apiKey));
         when(apiKeyRepository.save(any(ApiKey.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         apiKeyService.revokeApiKey(developer.getId(), apiKey.getId());
@@ -127,7 +127,7 @@ class ApiKeyServiceTest {
     @DisplayName("Should rotate API key: revoke old key and return newly generated key")
     void shouldRotateApiKey() {
         ApiKey oldKey = new ApiKey(UUID.randomUUID(), developer, plan, "Primary Key", "gk_live_11111111", "old_hash", null);
-        when(apiKeyRepository.findById(oldKey.getId())).thenReturn(Optional.of(oldKey));
+        when(apiKeyRepository.findByIdWithDetails(oldKey.getId())).thenReturn(Optional.of(oldKey));
         when(apiKeyRepository.save(any(ApiKey.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ApiKeyCreatedResponse response = apiKeyService.rotateApiKey(developer.getId(), oldKey.getId());

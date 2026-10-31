@@ -36,6 +36,9 @@ class ApiKeyControllerTest {
     @MockitoBean
     private ApiKeyService apiKeyService;
 
+    @MockitoBean
+    private com.gatekeeper.gateway.ratelimit.RateLimiter rateLimiter;
+
     @Test
     @DisplayName("POST /api/v1/keys creates key and returns 201 with raw key shown once")
     void shouldCreateApiKey() throws Exception {

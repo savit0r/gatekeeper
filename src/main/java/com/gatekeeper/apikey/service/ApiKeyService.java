@@ -157,7 +157,7 @@ public class ApiKeyService {
     }
 
     private ApiKey findApiKeyForDeveloper(UUID developerId, UUID keyId) {
-        ApiKey apiKey = apiKeyRepository.findById(keyId)
+        ApiKey apiKey = apiKeyRepository.findByIdWithDetails(keyId)
                 .orElseThrow(() -> new ApiKeyNotFoundException(keyId));
 
         if (!apiKey.getDeveloper().getId().equals(developerId)) {

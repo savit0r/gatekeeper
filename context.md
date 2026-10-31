@@ -251,29 +251,27 @@ commands that may have already succeeded.
 
 ## 10. Session Handoff
 
-**Last known milestone:** Milestone 2: API key lifecycle service, cryptographic generation, and REST endpoints (Completed). Current milestone: Milestone 3: Protected endpoint and Redis-backed atomic rate limiter.
+**Last known milestone:** Milestone 3: Protected endpoint and Redis-backed atomic rate limiter (Completed). Current milestone: Milestone 4: Usage event recording, asynchronous tracking, and basic usage analytics.
 
 **Last known confirmed state:**
-- Dedicated Git repository up to date with `origin/main` (`e52682b`).
+- Dedicated Git repository up to date with `origin/main` (`3e5256c`).
 - Docker containers (`gatekeeper-postgres` and `gatekeeper-redis`) are running and healthy.
-- Cryptographic API key generation (`ApiKeyCrypto`) implemented using 256-bit `SecureRandom` entropy, 16-char prefix (`gk_live_<hex>`), and SHA-256 hash.
-- Constant-time hash verification via `MessageDigest.isEqual` to prevent timing attacks.
-- `ApiKeyService` implements key creation (raw key displayed once), listing (raw keys omitted), retrieval, revocation, rotation, and validation.
-- `ApiKeyController` and `GlobalExceptionHandler` expose REST endpoints (`POST /api/v1/keys`, `GET /api/v1/keys`, `GET /api/v1/keys/{id}`, `DELETE /api/v1/keys/{id}`, `POST /api/v1/keys/{id}/rotate`).
-- Comprehensive unit and WebMvc test suite passing (19/19 tests passing).
+- Redis-backed atomic rate limiter (`RedisRateLimiter`) implemented using an atomic Lua script (`INCR`, `EXPIRE`, `TTL`) with fail-closed (default) and fail-open configurable outage policies.
+- Gateway interceptor (`ApiKeyRateLimitInterceptor`) validates incoming `X-API-Key` headers, extracts plan limits, enforces atomic rate limiting, attaches `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers, and returns HTTP `429 Too Many Requests` with `Retry-After` on exhaustion.
+- Protected sample endpoint (`GET /api/v1/protected/hello`) operational and verified.
+- Eager fetch queries added in `ApiKeyRepository` to eliminate lazy-loading proxy exceptions.
+- Entire test suite passes (26/26 tests passing, including full end-to-end integration tests in `GatewayIntegrationTest` using real Postgres and real Redis).
 
 **Next action:**
-1. Stage and commit Milestone 2 changes.
-2. Proceed to Milestone 3: Protected endpoint and Redis-backed atomic rate limiter:
-   - Implement rate limiting strategy using atomic Redis operations / Lua script (fixed window or sliding window counter).
-   - Create Spring MVC interceptor / filter for `X-API-Key` authentication and rate limiting.
-   - Attach standard rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`.
-   - Return HTTP `429 Too Many Requests` when limits are exceeded.
-   - Implement protected sample endpoint: `GET /api/v1/protected/hello`.
-   - Implement Redis failure handling (fail-open/fail-closed decision documented).
-   - Add integration tests for rate limiting and concurrency.
+1. Stage and commit Milestone 3 changes.
+2. Proceed to Milestone 4: Usage event recording & basic analytics:
+   - Create usage event listener / asynchronous recorder (`UsageEventService`) recording route, status code, latency (ms), decision (`ALLOWED`/`REJECTED`), and rejection reason.
+   - Attach postHandle / afterCompletion logging in `ApiKeyRateLimitInterceptor` to capture request outcomes without blocking client response latency.
+   - Expose analytics REST endpoint for developers (`GET /api/v1/analytics/usage` and `GET /api/v1/analytics/keys/{keyId}`).
+   - Unit and integration tests for usage recording and analytics.
 
 **Update this handoff after each meaningful milestone.**
+
 
 
 
