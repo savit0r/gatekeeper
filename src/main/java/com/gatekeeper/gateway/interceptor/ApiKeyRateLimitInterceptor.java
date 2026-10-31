@@ -5,8 +5,11 @@ import com.gatekeeper.apikey.service.ApiKeyService;
 import com.gatekeeper.gateway.ratelimit.RateLimitResult;
 import com.gatekeeper.gateway.ratelimit.RateLimiter;
 import com.gatekeeper.plans.domain.UsagePlan;
+import com.gatekeeper.usage.domain.UsageDecision;
+import com.gatekeeper.usage.service.UsageEventService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -15,6 +18,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 public class ApiKeyRateLimitInterceptor implements HandlerInterceptor {
@@ -25,24 +29,34 @@ public class ApiKeyRateLimitInterceptor implements HandlerInterceptor {
 
     private final ApiKeyService apiKeyService;
     private final RateLimiter rateLimiter;
+    private final ObjectProvider<UsageEventService> usageEventServiceProvider;
 
-    public ApiKeyRateLimitInterceptor(ApiKeyService apiKeyService, RateLimiter rateLimiter) {
+    public ApiKeyRateLimitInterceptor(
+            ApiKeyService apiKeyService,
+            RateLimiter rateLimiter,
+            ObjectProvider<UsageEventService> usageEventServiceProvider) {
         this.apiKeyService = apiKeyService;
         this.rateLimiter = rateLimiter;
+        this.usageEventServiceProvider = usageEventServiceProvider;
     }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        request.setAttribute(ATTR_START_TIME, System.currentTimeMillis());
+        long startTime = System.currentTimeMillis();
+        request.setAttribute(ATTR_START_TIME, startTime);
 
         String rawKey = request.getHeader(API_KEY_HEADER);
         if (rawKey == null || rawKey.isBlank()) {
+            recordUsage(null, request.getRequestURI(), 401, System.currentTimeMillis() - startTime,
+                    UsageDecision.REJECTED, "Missing X-API-Key header");
             writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Missing X-API-Key header");
             return false;
         }
 
         Optional<ApiKey> apiKeyOpt = apiKeyService.validateAndGetApiKey(rawKey);
         if (apiKeyOpt.isEmpty()) {
+            recordUsage(null, request.getRequestURI(), 401, System.currentTimeMillis() - startTime,
+                    UsageDecision.REJECTED, "Invalid, expired, or revoked API key");
             writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Invalid, expired, or revoked API key");
             return false;
         }
@@ -65,6 +79,9 @@ public class ApiKeyRateLimitInterceptor implements HandlerInterceptor {
         }
 
         if (!result.allowed()) {
+            recordUsage(apiKey.getId(), request.getRequestURI(), 429, System.currentTimeMillis() - startTime,
+                    UsageDecision.REJECTED, "Rate limit exceeded");
+
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setHeader("Retry-After", String.valueOf(result.resetSeconds()));
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -87,6 +104,26 @@ public class ApiKeyRateLimitInterceptor implements HandlerInterceptor {
 
         request.setAttribute(ATTR_API_KEY, apiKey);
         return true;
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        ApiKey apiKey = (ApiKey) request.getAttribute(ATTR_API_KEY);
+        Long startTime = (Long) request.getAttribute(ATTR_START_TIME);
+        long latencyMs = startTime != null ? (System.currentTimeMillis() - startTime) : 0L;
+
+        if (apiKey != null) {
+            recordUsage(apiKey.getId(), request.getRequestURI(), response.getStatus(), latencyMs,
+                    UsageDecision.ALLOWED, null);
+        }
+    }
+
+    private void recordUsage(UUID apiKeyId, String route, int statusCode, long latencyMs,
+                             UsageDecision decision, String rejectionReason) {
+        UsageEventService service = usageEventServiceProvider.getIfAvailable();
+        if (service != null) {
+            service.recordEventAsync(apiKeyId, route, statusCode, latencyMs, decision, rejectionReason);
+        }
     }
 
     private void writeErrorResponse(HttpServletResponse response, HttpStatus status, String message) throws IOException {

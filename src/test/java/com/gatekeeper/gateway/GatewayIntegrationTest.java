@@ -41,6 +41,8 @@ class GatewayIntegrationTest {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
+    private Developer developer;
+    private UUID apiKeyId;
     private String rawApiKey;
 
     @BeforeEach
@@ -51,7 +53,7 @@ class GatewayIntegrationTest {
             redisTemplate.delete(keys);
         }
 
-        Developer developer = new Developer(
+        developer = new Developer(
                 UUID.randomUUID(),
                 "rate-test-" + UUID.randomUUID() + "@gatekeeper.dev",
                 "pwd_hash",
@@ -74,11 +76,12 @@ class GatewayIntegrationTest {
                 developer.getId(),
                 new CreateApiKeyRequest("Test Key", plan.getId(), null)
         );
+        apiKeyId = created.id();
         rawApiKey = created.rawKey();
     }
 
     @Test
-    @DisplayName("Should enforce rate limits: 2 allowed requests, 3rd blocked with 429 and Retry-After header")
+    @DisplayName("Should enforce rate limits and record usage analytics: 2 allowed, 1 rate-limited, metrics reflect counts")
     void shouldEnforceRateLimitingUnderRealRedis() throws Exception {
         // 1st request -> Allowed (Remaining: 1)
         mockMvc.perform(get("/api/v1/protected/hello")
@@ -107,6 +110,25 @@ class GatewayIntegrationTest {
                 .andExpect(jsonPath("$.status").value(429))
                 .andExpect(jsonPath("$.error").value("Too Many Requests"))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Rate limit exceeded")));
+
+        // Give async event processing a moment to persist
+        Thread.sleep(150);
+
+        // Verify analytics summary endpoint reflects the 3 requests (2 allowed, 1 rejected)
+        mockMvc.perform(get("/api/v1/analytics/keys/" + apiKeyId + "/summary")
+                        .header("X-Developer-Id", developer.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.apiKeyId").value(apiKeyId.toString()))
+                .andExpect(jsonPath("$.totalRequests").value(3))
+                .andExpect(jsonPath("$.allowedRequests").value(2))
+                .andExpect(jsonPath("$.rejectedRequests").value(1));
+
+        // Verify recent events endpoint returns the logged records
+        mockMvc.perform(get("/api/v1/analytics/keys/" + apiKeyId + "/events")
+                        .header("X-Developer-Id", developer.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(3));
     }
 
     @Test

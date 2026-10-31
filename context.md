@@ -251,26 +251,25 @@ commands that may have already succeeded.
 
 ## 10. Session Handoff
 
-**Last known milestone:** Milestone 3: Protected endpoint and Redis-backed atomic rate limiter (Completed). Current milestone: Milestone 4: Usage event recording, asynchronous tracking, and basic usage analytics.
+**Last known milestone:** Milestone 4: Usage event recording, asynchronous tracking, and basic usage analytics (Completed). Current milestone: Milestone 5: Developer identity / dashboard authentication & OpenAPI documentation.
 
 **Last known confirmed state:**
-- Dedicated Git repository up to date with `origin/main` (`3e5256c`).
+- Dedicated Git repository up to date with `origin/main` (`5f06cc8`).
 - Docker containers (`gatekeeper-postgres` and `gatekeeper-redis`) are running and healthy.
-- Redis-backed atomic rate limiter (`RedisRateLimiter`) implemented using an atomic Lua script (`INCR`, `EXPIRE`, `TTL`) with fail-closed (default) and fail-open configurable outage policies.
-- Gateway interceptor (`ApiKeyRateLimitInterceptor`) validates incoming `X-API-Key` headers, extracts plan limits, enforces atomic rate limiting, attaches `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers, and returns HTTP `429 Too Many Requests` with `Retry-After` on exhaustion.
-- Protected sample endpoint (`GET /api/v1/protected/hello`) operational and verified.
-- Eager fetch queries added in `ApiKeyRepository` to eliminate lazy-loading proxy exceptions.
-- Entire test suite passes (26/26 tests passing, including full end-to-end integration tests in `GatewayIntegrationTest` using real Postgres and real Redis).
+- Asynchronous usage event recording (`UsageEventService`) saves request route, HTTP status code, latency (ms), decision (`ALLOWED`/`REJECTED`), and rejection reason without adding response overhead.
+- Gateway interceptor (`ApiKeyRateLimitInterceptor`) seamlessly logs allowed requests in `afterCompletion` and rejected requests in `preHandle`.
+- `UsageAnalyticsController` exposes `GET /api/v1/analytics/keys/{keyId}/summary` (total, allowed, rejected, avg latency) and `GET /api/v1/analytics/keys/{keyId}/events` (recent audit logs).
+- Full test suite passes: 32/32 tests passing, including `GatewayIntegrationTest` verifying rate limiting and event persistence in PostgreSQL.
 
 **Next action:**
-1. Stage and commit Milestone 3 changes.
-2. Proceed to Milestone 4: Usage event recording & basic analytics:
-   - Create usage event listener / asynchronous recorder (`UsageEventService`) recording route, status code, latency (ms), decision (`ALLOWED`/`REJECTED`), and rejection reason.
-   - Attach postHandle / afterCompletion logging in `ApiKeyRateLimitInterceptor` to capture request outcomes without blocking client response latency.
-   - Expose analytics REST endpoint for developers (`GET /api/v1/analytics/usage` and `GET /api/v1/analytics/keys/{keyId}`).
-   - Unit and integration tests for usage recording and analytics.
+1. Stage and commit Milestone 4 changes.
+2. Proceed to Milestone 5: Developer identity and OpenAPI docs:
+   - Developer registration and dashboard authentication.
+   - Springdoc OpenAPI (Swagger UI) configuration for developer API exploration.
+   - Seed initial default usage plans (e.g. Starter: 60 req/min, Pro: 1000 req/min).
 
 **Update this handoff after each meaningful milestone.**
+
 
 
 
