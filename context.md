@@ -251,11 +251,14 @@ commands that may have already succeeded.
 
 ## 10. Session Handoff
 
-**Last known milestone:** Milestone 5: Developer Registration, Seed Usage Plans, OpenAPI Documentation, and README Walkthrough (Completed). All MVP Success Criteria met!
+**Last known milestone:** CI Pipeline & Documentation Badges (Completed). All MVP Success Criteria met!
 
 **Last known confirmed state:**
-- Dedicated Git repository up to date with `origin/main` (`ce0c22f`).
+- Dedicated Git repository up to date with `origin/main` (`496b152`).
 - Docker containers (`gatekeeper-postgres` and `gatekeeper-redis`) are running and healthy.
+- Continuous Integration:
+  - `.github/workflows/ci.yml`: GitHub Actions pipeline with PostgreSQL 17 and Redis 7 service containers running `chmod +x mvnw && ./mvnw clean verify --batch-mode`.
+  - Build status badge linked in `README.md`.
 - Flyway migrations:
   - `V1__init_schema.sql`: tables for `developers`, `usage_plans`, `api_keys`, `usage_events`, indexes.
   - `V2__seed_default_plans.sql`: seeds deterministic default plans (`Starter`, `Pro`, `Enterprise`).
@@ -277,9 +280,9 @@ commands that may have already succeeded.
 - Full test suite: 40/40 tests passing (unit, slice, and end-to-end integration against PostgreSQL and Redis).
 
 **Next action:**
-1. Stage and commit Milestone 5 changes.
-2. Push to `origin/main`.
-3. Provide final summary and verification steps to the user.
+1. Stage and commit `.github/workflows/ci.yml`, `README.md`, and `context.md`.
+2. Push to `origin/main` so GitHub Actions automatically executes the workflow on GitHub.
+3. Review options for subsequent enhancements (e.g. Redis key caching, JWT dashboard auth, Prometheus metrics).
 
 **Update this handoff after each meaningful milestone.**
 

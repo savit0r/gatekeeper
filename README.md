@@ -2,6 +2,7 @@
 
 > **A portfolio-grade, developer-focused API key lifecycle management and atomic rate-limiting platform built with Spring Boot, PostgreSQL, and Redis.**
 
+[![CI Build & Test](https://github.com/savit0r/gatekeeper/actions/workflows/ci.yml/badge.svg)](https://github.com/savit0r/gatekeeper/actions/workflows/ci.yml)
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://adoptium.net/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg)](https://www.postgresql.org/)
