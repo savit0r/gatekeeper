@@ -11,6 +11,7 @@
 [![Prometheus Metrics](https://img.shields.io/badge/Metrics-Prometheus%20Scrape-blueviolet.svg)](http://localhost:8080/actuator/prometheus)
 [![Docker](https://img.shields.io/badge/Docker-Multi--stage%20Alpine-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Virtual Threads](https://img.shields.io/badge/Java%2021-Virtual%20Threads-blue.svg)](https://openjdk.org/jeps/444)
+[![Web Console](https://img.shields.io/badge/Console-Developer%20Dashboard-06b6d4.svg)](http://localhost:8080/)
 
 ---
 
@@ -83,9 +84,9 @@ Launch PostgreSQL 17, Redis 7, and Gatekeeper together in optimized multi-stage 
 ```bash
 docker compose up --build -d
 ```
-* **Gatekeeper API**: `http://localhost:8080`
+* **Developer Web Console**: `http://localhost:8080/` (Sleek dark-mode dashboard for JWT auth, key provisioning, visual playground, & analytics)
 * **Swagger UI / Interactive Docs**: `http://localhost:8080/swagger-ui.html`
-* **Prometheus Metrics**: `http://localhost:8080/actuator/prometheus`
+* **Prometheus Metrics Scrape**: `http://localhost:8080/actuator/prometheus`
 
 ---
 
