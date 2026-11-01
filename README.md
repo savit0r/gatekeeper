@@ -7,7 +7,8 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7%20Alpine-red.svg)](https://redis.io/)
-[![Build & Test](https://img.shields.io/badge/Tests-58%20Passed-success.svg)]()
+[![Build & Test](https://img.shields.io/badge/Tests-64%20Passed-success.svg)]()
+[![Prometheus Metrics](https://img.shields.io/badge/Metrics-Prometheus%20Scrape-blueviolet.svg)](http://localhost:8080/actuator/prometheus)
 
 ---
 
@@ -211,14 +212,28 @@ The old key is immediately revoked, and a fresh key is generated with the same p
 
 ---
 
+### 8. Prometheus Metrics Scrape
+Scrape real-time operational metrics across rate limiting, key lifecycle, sub-millisecond Redis caching, and gateway latency:
+```bash
+curl -s http://localhost:8080/actuator/prometheus
+```
+**Exported Series:**
+* `gatekeeper_ratelimit_requests_total{status="allowed|rejected", plan="..."}`: Rate-limiting quota enforcement decisions.
+* `gatekeeper_keycache_lookups_total{result="hit|miss"}`: Redis hot-path key cache efficiency.
+* `gatekeeper_key_lifecycle_total{action="created|revoked|rotated"}`: Key management lifecycle operations.
+* `gatekeeper_auth_logins_total{result="success|failure"}`: Developer authentication attempts.
+* `gatekeeper_gateway_latency_seconds`: Nanosecond-precision gateway processing latency timer.
+
+---
+
 ## Running Automated Tests
 
-Run the full automated test suite (unit tests, web slice tests, and live Testcontainers/Docker integration tests):
+Run the full automated test suite (unit tests, web slice tests, and live Docker integration tests):
 
 ```bash
 ./mvnw test
 ```
-All **40 tests** run against real PostgreSQL and Redis instances.
+All **64 tests** run against real PostgreSQL and Redis instances.
 
 ---
 

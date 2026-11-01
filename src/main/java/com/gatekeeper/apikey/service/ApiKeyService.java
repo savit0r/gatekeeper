@@ -17,6 +17,8 @@ import com.gatekeeper.plans.repository.UsagePlanRepository;
 import com.gatekeeper.apikey.cache.ApiKeyCache;
 import com.gatekeeper.apikey.cache.CachedApiKey;
 import com.gatekeeper.apikey.cache.NoOpApiKeyCache;
+import com.gatekeeper.observability.GatekeeperMetrics;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,25 +37,36 @@ public class ApiKeyService {
     private final UsagePlanRepository usagePlanRepository;
     private final ApiKeyCrypto apiKeyCrypto;
     private final ApiKeyCache apiKeyCache;
+    private final ObjectProvider<GatekeeperMetrics> metricsProvider;
 
     @Autowired
     public ApiKeyService(ApiKeyRepository apiKeyRepository,
                          DeveloperRepository developerRepository,
                          UsagePlanRepository usagePlanRepository,
                          ApiKeyCrypto apiKeyCrypto,
-                         ApiKeyCache apiKeyCache) {
+                         ApiKeyCache apiKeyCache,
+                         ObjectProvider<GatekeeperMetrics> metricsProvider) {
         this.apiKeyRepository = apiKeyRepository;
         this.developerRepository = developerRepository;
         this.usagePlanRepository = usagePlanRepository;
         this.apiKeyCrypto = apiKeyCrypto;
         this.apiKeyCache = apiKeyCache;
+        this.metricsProvider = metricsProvider;
+    }
+
+    public ApiKeyService(ApiKeyRepository apiKeyRepository,
+                         DeveloperRepository developerRepository,
+                         UsagePlanRepository usagePlanRepository,
+                         ApiKeyCrypto apiKeyCrypto,
+                         ApiKeyCache apiKeyCache) {
+        this(apiKeyRepository, developerRepository, usagePlanRepository, apiKeyCrypto, apiKeyCache, null);
     }
 
     public ApiKeyService(ApiKeyRepository apiKeyRepository,
                          DeveloperRepository developerRepository,
                          UsagePlanRepository usagePlanRepository,
                          ApiKeyCrypto apiKeyCrypto) {
-        this(apiKeyRepository, developerRepository, usagePlanRepository, apiKeyCrypto, new NoOpApiKeyCache());
+        this(apiKeyRepository, developerRepository, usagePlanRepository, apiKeyCrypto, new NoOpApiKeyCache(), null);
     }
 
     public ApiKeyCreatedResponse createApiKey(UUID developerId, CreateApiKeyRequest request) {
@@ -76,6 +89,10 @@ public class ApiKeyService {
         );
 
         ApiKey saved = apiKeyRepository.save(apiKey);
+
+        if (metricsProvider != null && metricsProvider.getIfAvailable() != null) {
+            metricsProvider.getIfAvailable().recordKeyAction("created");
+        }
 
         return new ApiKeyCreatedResponse(
                 saved.getId(),
@@ -111,6 +128,10 @@ public class ApiKeyService {
         apiKey.revoke();
         apiKeyRepository.save(apiKey);
         apiKeyCache.evict(apiKey.getKeyHash());
+
+        if (metricsProvider != null && metricsProvider.getIfAvailable() != null) {
+            metricsProvider.getIfAvailable().recordKeyAction("revoked");
+        }
     }
 
     public ApiKeyCreatedResponse rotateApiKey(UUID developerId, UUID keyId) {
@@ -131,6 +152,10 @@ public class ApiKeyService {
         );
 
         ApiKey saved = apiKeyRepository.save(newKey);
+
+        if (metricsProvider != null && metricsProvider.getIfAvailable() != null) {
+            metricsProvider.getIfAvailable().recordKeyAction("rotated");
+        }
 
         return new ApiKeyCreatedResponse(
                 saved.getId(),
@@ -168,10 +193,19 @@ public class ApiKeyService {
                 apiKeyCache.evict(rawKeyHash);
                 return Optional.empty();
             }
+
+            if (metricsProvider != null && metricsProvider.getIfAvailable() != null) {
+                metricsProvider.getIfAvailable().recordCacheHit();
+            }
+
             UsagePlan plan = new UsagePlan(cached.planId(), cached.planName(), cached.requestsPerWindow(), cached.windowSeconds(), null);
             Developer dev = new Developer(cached.developerId(), "cached@gatekeeper.local", "cached", "ROLE_DEVELOPER", null);
             ApiKey apiKey = new ApiKey(cached.id(), dev, plan, cached.name(), cached.keyPrefix(), cached.keyHash(), cached.expiresAt());
             return Optional.of(apiKey);
+        }
+
+        if (metricsProvider != null && metricsProvider.getIfAvailable() != null) {
+            metricsProvider.getIfAvailable().recordCacheMiss();
         }
 
         // 2. Cache miss: DB query by prefix candidate

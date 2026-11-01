@@ -9,6 +9,8 @@ import com.gatekeeper.usage.domain.UsageDecision;
 import com.gatekeeper.usage.service.UsageEventService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.gatekeeper.observability.GatekeeperMetrics;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,14 +32,25 @@ public class ApiKeyRateLimitInterceptor implements HandlerInterceptor {
     private final ApiKeyService apiKeyService;
     private final RateLimiter rateLimiter;
     private final ObjectProvider<UsageEventService> usageEventServiceProvider;
+    private final ObjectProvider<GatekeeperMetrics> metricsProvider;
+
+    @Autowired
+    public ApiKeyRateLimitInterceptor(
+            ApiKeyService apiKeyService,
+            RateLimiter rateLimiter,
+            ObjectProvider<UsageEventService> usageEventServiceProvider,
+            ObjectProvider<GatekeeperMetrics> metricsProvider) {
+        this.apiKeyService = apiKeyService;
+        this.rateLimiter = rateLimiter;
+        this.usageEventServiceProvider = usageEventServiceProvider;
+        this.metricsProvider = metricsProvider;
+    }
 
     public ApiKeyRateLimitInterceptor(
             ApiKeyService apiKeyService,
             RateLimiter rateLimiter,
             ObjectProvider<UsageEventService> usageEventServiceProvider) {
-        this.apiKeyService = apiKeyService;
-        this.rateLimiter = rateLimiter;
-        this.usageEventServiceProvider = usageEventServiceProvider;
+        this(apiKeyService, rateLimiter, usageEventServiceProvider, null);
     }
 
     @Override
@@ -82,6 +95,10 @@ public class ApiKeyRateLimitInterceptor implements HandlerInterceptor {
             recordUsage(apiKey.getId(), request.getRequestURI(), 429, System.currentTimeMillis() - startTime,
                     UsageDecision.REJECTED, "Rate limit exceeded");
 
+            if (metricsProvider != null && metricsProvider.getIfAvailable() != null) {
+                metricsProvider.getIfAvailable().recordRateLimitRejected(plan.getName());
+            }
+
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setHeader("Retry-After", String.valueOf(result.resetSeconds()));
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -102,6 +119,10 @@ public class ApiKeyRateLimitInterceptor implements HandlerInterceptor {
             return false;
         }
 
+        if (metricsProvider != null && metricsProvider.getIfAvailable() != null) {
+            metricsProvider.getIfAvailable().recordRateLimitAllowed(plan.getName());
+        }
+
         request.setAttribute(ATTR_API_KEY, apiKey);
         return true;
     }
@@ -111,6 +132,10 @@ public class ApiKeyRateLimitInterceptor implements HandlerInterceptor {
         ApiKey apiKey = (ApiKey) request.getAttribute(ATTR_API_KEY);
         Long startTime = (Long) request.getAttribute(ATTR_START_TIME);
         long latencyMs = startTime != null ? (System.currentTimeMillis() - startTime) : 0L;
+
+        if (metricsProvider != null && metricsProvider.getIfAvailable() != null) {
+            metricsProvider.getIfAvailable().recordGatewayLatency(latencyMs);
+        }
 
         if (apiKey != null) {
             recordUsage(apiKey.getId(), request.getRequestURI(), response.getStatus(), latencyMs,

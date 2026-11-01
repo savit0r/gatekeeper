@@ -251,14 +251,26 @@ commands that may have already succeeded.
 
 ## 10. Session Handoff
 
-**Last known milestone:** Developer JWT Authentication & Security (Completed). Stateless HMAC-SHA256 Bearer token authentication for all dashboard APIs!
+**Last known milestone:** Observability & Prometheus Metrics (Completed). Production-grade Prometheus metrics scraping (`/actuator/prometheus`) and Micrometer telemetry across Gatekeeper!
 
 **Last known confirmed state:**
-- Dedicated Git repository up to date with `origin/main` (`2074110`).
+- Dedicated Git repository up to date with `origin/main` (`d31d62c`).
 - Docker containers (`gatekeeper-postgres` and `gatekeeper-redis`) are running and healthy.
 - Continuous Integration:
   - `.github/workflows/ci.yml`: GitHub Actions pipeline with PostgreSQL 17 and Redis 7 service containers running `chmod +x mvnw && ./mvnw clean verify --batch-mode`.
   - Build status badge linked in `README.md`.
+- Observability & Prometheus Metrics:
+  - Added `io.micrometer:micrometer-registry-prometheus` to `pom.xml`.
+  - Exposed Actuator endpoints (`health,info,prometheus,metrics`) with `management.prometheus.metrics.export.enabled=true` in `application.properties`.
+  - `GatekeeperMetrics`: central component registering custom domain meters:
+    - `gatekeeper.ratelimit.requests` (`status: allowed|rejected`, `plan: <planName>`)
+    - `gatekeeper.keycache.lookups` (`result: hit|miss`)
+    - `gatekeeper.key.lifecycle` (`action: created|revoked|rotated`)
+    - `gatekeeper.auth.logins` (`result: success|failure`)
+    - `gatekeeper.gateway.latency` (nanosecond-precision timer)
+  - Seamlessly instrumented `ApiKeyRateLimitInterceptor`, `ApiKeyService`, and `AuthService` using non-invasive `ObjectProvider<GatekeeperMetrics>`.
+  - `GatekeeperMetricsTest`: comprehensive unit test suite verifying meter tag consistency and registrations.
+  - `PrometheusEndpointIntegrationTest`: full MockMvc integration test verifying `/actuator/health` and `/actuator/prometheus` scraping.
 - Developer JWT Authentication:
   - `JwtService`: zero-dependency HMAC-SHA256 JWT creation, signing, parsing, constant-time signature verification, and expiration enforcement.
   - `AuthService` & `AuthController`: `POST /api/v1/auth/login` verifies developer credentials and issues signed Bearer tokens.
@@ -287,12 +299,14 @@ commands that may have already succeeded.
 - OpenAPI & Documentation:
   - Springdoc OpenAPI (Swagger UI) configured at `/swagger-ui.html`.
   - Comprehensive `README.md` with Mermaid architecture diagram, quickstart guide, and cURL walkthrough.
-- Full test suite: 58/58 tests passing (unit, slice, and end-to-end integration against PostgreSQL and Redis).
+- Full test suite: 64/64 tests passing (0 failures, 0 errors across unit, slice, and integration tests).
 
 **Next action:**
-1. Stage and commit JWT authentication changes.
+1. Stage and commit Observability & Prometheus Metrics changes.
 2. Push to `origin/main` so GitHub Actions automatically executes the workflow.
-3. Review subsequent enhancements (e.g. Micrometer Prometheus metrics).
+3. Proceed with remaining stages:
+   - Stage 2: Production Containerization (`Dockerfile` multi-stage build + production profile).
+   - Stage 3: High-Concurrency Virtual Thread / k6 Stress Benchmark.
 
 **Update this handoff after each meaningful milestone.**
 
