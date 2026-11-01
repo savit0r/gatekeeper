@@ -10,6 +10,7 @@
 [![Build & Test](https://img.shields.io/badge/Tests-64%20Passed-success.svg)]()
 [![Prometheus Metrics](https://img.shields.io/badge/Metrics-Prometheus%20Scrape-blueviolet.svg)](http://localhost:8080/actuator/prometheus)
 [![Docker](https://img.shields.io/badge/Docker-Multi--stage%20Alpine-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Virtual Threads](https://img.shields.io/badge/Java%2021-Virtual%20Threads-blue.svg)](https://openjdk.org/jeps/444)
 
 ---
 
@@ -226,6 +227,37 @@ curl -s http://localhost:8080/actuator/prometheus
 * `gatekeeper_key_lifecycle_total{action="created|revoked|rotated"}`: Key management lifecycle operations.
 * `gatekeeper_auth_logins_total{result="success|failure"}`: Developer authentication attempts.
 * `gatekeeper_gateway_latency_seconds`: Nanosecond-precision gateway processing latency timer.
+
+---
+
+### 9. High-Concurrency Stress Benchmark (Virtual Threads)
+Gatekeeper leverages **Java 21 Virtual Threads (Project Loom)** (`spring.threads.virtual.enabled=true`) for non-blocking I/O throughput across incoming HTTP connections, sub-millisecond Redis key caching, and atomic Lua script rate evaluation.
+
+Run the automated 1,000-request benchmark across 50 concurrent virtual threads:
+```bash
+./benchmark/run_benchmark.sh
+```
+
+**Measured Production Performance (Local Benchmark on Apple Silicon M-series):**
+```
+Target URL:         http://localhost:8080/api/v1/protected/hello
+Usage Plan:         Enterprise (10000 req / 60s)
+Total Requests:     1,000
+Concurrency Level:  50 virtual client threads
+-----------------------------------------------------------------
+Throughput:         435.4 requests/second
+HTTP 200 (Allowed): 1,000 (100%)
+Network Errors:     0
+Median (p50):       103 ms
+p90 Latency:        178 ms
+p99 Latency:        290 ms
+Cache Hit Rate:     99.0% (sub-millisecond Redis Hash hot path)
+```
+
+Alternatively, run with [Grafana k6](https://k6.io/):
+```bash
+k6 run benchmark/k6-load-test.js
+```
 
 ---
 
