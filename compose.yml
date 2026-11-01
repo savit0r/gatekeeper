@@ -1,5 +1,26 @@
-
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gatekeeper:latest
+    container_name: gatekeeper-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/gatekeeper
+      SPRING_DATASOURCE_USERNAME: gatekeeper
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-gatekeeper_dev}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-gatekeeper-super-secret-developer-jwt-signing-key-minimum-256-bits!}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   postgres:
     image: postgres:17
     container_name: gatekeeper-postgres

@@ -9,6 +9,7 @@
 [![Redis](https://img.shields.io/badge/Redis-7%20Alpine-red.svg)](https://redis.io/)
 [![Build & Test](https://img.shields.io/badge/Tests-64%20Passed-success.svg)]()
 [![Prometheus Metrics](https://img.shields.io/badge/Metrics-Prometheus%20Scrape-blueviolet.svg)](http://localhost:8080/actuator/prometheus)
+[![Docker](https://img.shields.io/badge/Docker-Multi--stage%20Alpine-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 
 ---
 
@@ -70,28 +71,30 @@ flowchart TD
 ## Quickstart
 
 ### Prerequisites
-- **Java 21**
 - **Docker Desktop & Docker Compose**
+- **Java 21** (optional, only for local source compilation)
 
-### 1. Start Infrastructure
+---
+
+### Option A: One-Command Full Stack (Docker Compose)
+Launch PostgreSQL 17, Redis 7, and Gatekeeper together in optimized multi-stage containers:
+
 ```bash
-docker compose up -d
+docker compose up --build -d
 ```
-This spins up:
-- **PostgreSQL 17** on port `5432`
-- **Redis 7 (Alpine)** on port `6379`
+* **Gatekeeper API**: `http://localhost:8080`
+* **Swagger UI / Interactive Docs**: `http://localhost:8080/swagger-ui.html`
+* **Prometheus Metrics**: `http://localhost:8080/actuator/prometheus`
 
-### 2. Run Application
+---
+
+### Option B: Local Development
 ```bash
+# 1. Start backing services
+docker compose up -d postgres redis
+
+# 2. Run Spring Boot locally
 ./mvnw spring-boot:run
-```
-
-The application will start on `http://localhost:8080`.
-
-### 3. Interactive OpenAPI / Swagger UI
-Open your browser to explore and execute API requests:
-```
-http://localhost:8080/swagger-ui.html
 ```
 
 ---

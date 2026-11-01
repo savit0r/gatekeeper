@@ -1,0 +1,13 @@
+target/
+.git/
+.gitignore
+.github/
+.idea/
+.vscode/
+*.iml
+*.log
+.DS_Store
+compose.yml
+context.md
+skills.md
+README.md

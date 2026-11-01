@@ -251,15 +251,22 @@ commands that may have already succeeded.
 
 ## 10. Session Handoff
 
-**Last known milestone:** Observability & Prometheus Metrics (Completed). Production-grade Prometheus metrics scraping (`/actuator/prometheus`) and Micrometer telemetry across Gatekeeper!
+**Last known milestone:** Production Containerization (Completed). Multi-stage Alpine containerization with layer extraction, non-root user security, and full docker-compose integration!
 
 **Last known confirmed state:**
-- Dedicated Git repository up to date with `origin/main` (`d31d62c`).
+- Dedicated Git repository up to date with `origin/main` (`5f0a0cd`).
 - Docker containers (`gatekeeper-postgres` and `gatekeeper-redis`) are running and healthy.
 - Continuous Integration:
   - `.github/workflows/ci.yml`: GitHub Actions pipeline with PostgreSQL 17 and Redis 7 service containers running `chmod +x mvnw && ./mvnw clean verify --batch-mode`.
   - Build status badge linked in `README.md`.
-- Observability & Prometheus Metrics:
+- Production Containerization (Stage 2):
+  - `.dockerignore`: clean build context excluding target directories, Git metadata, and local state.
+  - `Dockerfile`: optimized multi-stage build:
+    - Stage 1 (`eclipse-temurin:21-jdk-alpine`): offline dependency caching, maven packaging, and Spring Boot tools layer extraction (`dependencies`, `spring-boot-loader`, `snapshot-dependencies`, `application`).
+    - Stage 2 (`eclipse-temurin:21-jre-alpine`): minimal 436MB image with `curl` for liveness probes, dedicated non-root `gatekeeper:gatekeeper` system user/group (least privilege), container-aware JVM flags (`-XX:+UseContainerSupport`, `-XX:MaxRAMPercentage=75.0`), and `JarLauncher` entrypoint.
+    - Verified container execution, non-root runtime, and `healthy` docker healthcheck.
+  - `compose.yml`: complete unified stack with `app` service wired to `postgres` and `redis` with explicit healthcheck dependency conditions (`service_healthy`).
+- Observability & Prometheus Metrics (Stage 1):
   - Added `io.micrometer:micrometer-registry-prometheus` to `pom.xml`.
   - Exposed Actuator endpoints (`health,info,prometheus,metrics`) with `management.prometheus.metrics.export.enabled=true` in `application.properties`.
   - `GatekeeperMetrics`: central component registering custom domain meters:
@@ -302,10 +309,9 @@ commands that may have already succeeded.
 - Full test suite: 64/64 tests passing (0 failures, 0 errors across unit, slice, and integration tests).
 
 **Next action:**
-1. Stage and commit Observability & Prometheus Metrics changes.
+1. Stage and commit Production Containerization files (`Dockerfile`, `.dockerignore`, `compose.yml`, `README.md`, `context.md`).
 2. Push to `origin/main` so GitHub Actions automatically executes the workflow.
-3. Proceed with remaining stages:
-   - Stage 2: Production Containerization (`Dockerfile` multi-stage build + production profile).
+3. Review subsequent remaining stage:
    - Stage 3: High-Concurrency Virtual Thread / k6 Stress Benchmark.
 
 **Update this handoff after each meaningful milestone.**
